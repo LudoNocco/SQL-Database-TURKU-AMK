@@ -1,0 +1,226 @@
+--SECTION 1: DATABASE CREATION
+
+-- Create Properties table
+CREATE TABLE Properties (
+    id INTEGER PRIMARY KEY,
+    address TEXT NOT NULL,
+    total_area DECIMAL,
+    floor_number INTEGER,
+    current_status TEXT,
+    project_start_date DATE,
+    expected_completion_date DATE,
+    actual_completion_date DATE
+);
+
+-- Create Apartments table
+CREATE TABLE Apartments (
+    id INTEGER PRIMARY KEY,
+    property_id INTEGER REFERENCES Properties(id),
+    unit_number TEXT,
+    area DECIMAL,
+    floor_plan TEXT,
+    current_status TEXT
+);
+
+-- Create Rooms table
+CREATE TABLE Rooms (
+    id INTEGER PRIMARY KEY,
+    apartment_id INTEGER REFERENCES Apartments(id),
+    name TEXT,
+    area DECIMAL,
+    type TEXT,
+    current_status TEXT
+);
+
+-- Create Contractors table
+CREATE TABLE Contractors (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    specialty TEXT,
+    license_number TEXT,
+    contact_person TEXT,
+    phone TEXT,
+    email TEXT,
+    address TEXT,
+    tax_id TEXT,
+    insurance_info TEXT
+);
+
+-- Create Work_Items table
+CREATE TABLE Work_Items (
+    id INTEGER PRIMARY KEY,
+    room_id INTEGER REFERENCES Rooms(id),
+    contractor_id INTEGER REFERENCES Contractors(id),
+    description TEXT,
+    status TEXT,
+    priority INTEGER,
+    start_date DATE,
+    end_date DATE,
+    estimated_cost DECIMAL,
+    actual_cost DECIMAL,
+    notes TEXT
+);
+
+-- Create Materials table
+CREATE TABLE Materials (
+    id INTEGER PRIMARY KEY,
+    name TEXT,
+    category TEXT,
+    specifications TEXT,
+    unit TEXT,
+    unit_cost DECIMAL,
+    minimum_order_quantity INTEGER,
+    lead_time_days INTEGER
+);
+
+-- Create Vendors table
+CREATE TABLE Vendors (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT,
+    contact_person TEXT,
+    phone TEXT,
+    email TEXT,
+    address TEXT,
+    payment_terms TEXT,
+    delivery_terms TEXT
+);
+
+-- Create Material_Orders table
+CREATE TABLE Material_Orders (
+    id INTEGER PRIMARY KEY,
+    vendor_id INTEGER REFERENCES Vendors(id),
+    material_id INTEGER REFERENCES Materials(id),
+    work_item_id INTEGER REFERENCES Work_Items(id),
+    quantity DECIMAL,
+    unit_price DECIMAL,
+    order_date DATE,
+    expected_delivery_date DATE,
+    actual_delivery_date DATE,
+    status TEXT
+);
+
+-- Create Invoices table
+CREATE TABLE Invoices (
+    id INTEGER PRIMARY KEY,
+    contractor_id INTEGER REFERENCES Contractors(id),
+    vendor_id INTEGER REFERENCES Vendors(id),
+    invoice_number TEXT,
+    date DATE,
+    amount DECIMAL,
+    status TEXT,
+    payment_date DATE,
+    payment_method TEXT,
+    notes TEXT
+);
+
+-- Insert statements
+INSERT INTO Properties (address, total_area, floor_number, current_status, project_start_date, expected_completion_date)
+VALUES 
+('Via Verdi 119 Calimera LE Italy', 240, 1, 'Active', '2024-01-01', '2024-12-31'),
+('Via Puccini 20 Calimera LE Italy', 300, 2, 'Planning', '2024-02-01', '2025-01-31');
+
+INSERT INTO Apartments (property_id, unit_number, area, floor_plan, current_status)
+VALUES 
+(1, 'A1', 120, '2BHK', 'Ongoing'),
+(1, 'A2', 110, '2BHK', 'Ongoing'),
+(2, 'B1', 150, '3BHK', 'Planning');
+
+INSERT INTO Rooms (apartment_id, name, area, type, current_status)
+VALUES 
+(1, 'Living Room', 30, 'Living', 'Ongoing'),
+(1, 'Bedroom 1', 20, 'Bedroom', 'Ongoing'),
+(2, 'Living Room', 28, 'Living', 'Ongoing'),
+(3, 'Master Bedroom', 35, 'Bedroom', 'Planning');
+
+--SECTION 2: QUERYING THE DATABASE
+
+-- SQL Query Examples
+SELECT r.name AS room, a.unit_number AS apartment_unit
+FROM Rooms r
+JOIN Apartments a ON r.apartment_id = a.id;
+
+SELECT a.unit_number AS apartment_unit, SUM(r.area) AS total_area
+FROM Rooms r
+JOIN Apartments a ON r.apartment_id = a.id
+GROUP BY a.unit_number;
+
+SELECT a.unit_number AS apartment_unit, COUNT(r.id) AS room_count
+FROM Apartments a
+JOIN Rooms r ON a.id = r.apartment_id
+GROUP BY a.unit_number;
+
+SELECT m.name, m.category, m.unit_cost
+FROM Materials m
+WHERE m.unit_cost > (
+    SELECT AVG(unit_cost)
+    FROM Materials
+    WHERE category = m.category
+);
+
+-- SQL View
+CREATE VIEW Material_Details_View AS
+SELECT 
+    m.id AS material_id,
+    m.name AS material_name,
+    m.category AS material_category,
+    m.unit AS unit,
+    m.unit_cost,
+    m.minimum_order_quantity,
+    m.lead_time_days
+FROM Materials m;
+
+--SECTION 3: MANAGING ACCESS
+
+-- Creating roles for stakeholders
+CREATE ROLE project_manager WITH LOGIN PASSWORD 'securepassword';
+CREATE ROLE contractor WITH LOGIN PASSWORD 'securepassword';
+CREATE ROLE vendor WITH LOGIN PASSWORD 'securepassword';
+
+-- Granting permissions
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO project_manager;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO contractor;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO vendor;
+
+-- Group role for efficient management
+CREATE ROLE contractors_vendors;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO contractors_vendors;
+GRANT contractors_vendors TO contractor;
+GRANT contractors_vendors TO vendor;
+
+-- Default privileges for future tables
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO project_manager;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO contractors_vendors;
+
+-- Adding a new role for inspectors
+CREATE ROLE inspector WITH LOGIN PASSWORD 'securepassword';
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO inspector;
+
+--SECTION 4: PYTHON CODE THAT WOULD BE REQUIRED TO CONNECT TO DATABASE AND EXECUTE QUERY
+
+--import sqlite3
+
+--conn = sqlite3.connect('C:/Users/lrnoc/Ludovico_Nocco.db')  
+--cursor = conn.cursor()
+
+--try:
+--    query = """
+--        SELECT m.name, m.category, m.unit_cost
+--        FROM Materials m
+--        WHERE m.unit_cost > (
+--            SELECT AVG(unit_cost)
+--            FROM Materials
+--            WHERE category = m.category
+--       );
+--    """
+--    cursor.execute(query)
+
+--    results = cursor.fetchall()
+--    for row in results:
+--        print(f"Name: {row[0]}, Category: {row[1]}, Unit Cost: {row[2]}")
+
+--except sqlite3.OperationalError as e:
+--    print("An error occurred:", e)
+
+--finally:
+--    conn.close()
